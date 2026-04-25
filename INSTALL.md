@@ -3,7 +3,7 @@
 ## TL;DR
 
 ```bash
-git clone https://github.com/ObaCorp/claude-code-build-kit
+git clone https://github.com/obatried/claude-code-build-kit
 cd claude-code-build-kit
 ./install.sh
 ```
