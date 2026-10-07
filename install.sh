@@ -22,7 +22,7 @@ for cmd in codex jq git bash; do
 done
 
 # ─── Soft deps ──────────────────────────────────────────────────────────────
-command -v gstack >/dev/null 2>&1 || warn "gstack not found — /build's QA + design steps will degrade. Install: see https://github.com/anthropics/gstack"
+[ -d "$HOME/.claude/skills/gstack" ] || [ -d "$HOME/.agents/skills/gstack" ] || warn "gstack not found — /build's QA steps will degrade to a manual smoke test. Install: see https://github.com/garrytan/gstack"
 
 # ─── Backup ─────────────────────────────────────────────────────────────────
 TS=$(date +%Y%m%d-%H%M%S)
@@ -50,6 +50,7 @@ cp "$KIT_DIR/claude/skills/build/SKILL.md" "$HOME/.claude/skills/build/SKILL.md"
 # Scripts
 cp "$KIT_DIR/claude/scripts/build-manifest/manifest.sh" "$HOME/.claude/scripts/build-manifest/manifest.sh"
 cp "$KIT_DIR/claude/scripts/codex-commit-review.sh"     "$HOME/.claude/scripts/codex-commit-review.sh"
+cp "$KIT_DIR/claude/scripts/codex-prompt-header.txt"   "$HOME/.claude/scripts/codex-prompt-header.txt"
 # `cp -R src dst` nests src into dst on a second run when dst already exists.
 # Wipe the target and copy the contents to make this idempotent.
 rm -rf "$HOME/.claude/scripts/codex-commit-review.prompts"

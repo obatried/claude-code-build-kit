@@ -13,13 +13,14 @@ Then restart your shell and try `/build` in any project.
 ## What `install.sh` does
 
 1. **Checks hard dependencies** — `codex`, `jq`, `git`, `bash`. Fails loud if any are missing.
-2. **Warns on the soft dependency** — `gstack`. Install proceeds either way. Vibecop is per-repo (npm), so the installer doesn't probe for it; the `vibecop-on-edit` hook no-ops cleanly when it's not present.
+2. **Warns on the soft dependency** — [gstack](https://github.com/garrytan/gstack). Install proceeds either way. Vibecop is per-repo (npm), so the installer doesn't probe for it; the `vibecop-on-edit` hook no-ops cleanly when it's not present.
 3. **Backs up your existing `~/.claude/`** to `~/.claude.bak.<timestamp>/` before touching anything.
 4. **Copies files** into the right paths:
    - `~/.claude/CLAUDE.md`, `CLAUDE_MAINTENANCE.md`, `CLAUDE_MAP.md`
    - `~/.claude/skills/build/SKILL.md`
    - `~/.claude/scripts/build-manifest/manifest.sh`
    - `~/.claude/scripts/codex-commit-review.sh` + `.prompts/`
+   - `~/.claude/scripts/codex-prompt-header.txt` (the shared boundary header every Codex prompt starts with)
    - `~/.claude/scripts/vibecop-adjudicate*.sh`
    - `~/.claude/scripts/gave-up-early-review.sh`
    - 9 hooks under `~/.claude/hooks/`
@@ -47,7 +48,12 @@ If you don't trust the installer, the layout maps 1:1:
 | `codex-config.template.toml` | `~/.codex/config.toml` |
 | `zshrc-snippet.sh` | append to `~/.zshrc` |
 
-`chmod +x ~/.claude/handoff-v3.sh ~/.claude/scripts/**/*.sh ~/.claude/hooks/*.sh` after copying.
+After copying, make the scripts executable:
+
+```bash
+chmod +x ~/.claude/handoff-v3.sh
+find ~/.claude/scripts ~/.claude/hooks -name '*.sh' -exec chmod +x {} +
+```
 
 ## Verifying the install
 

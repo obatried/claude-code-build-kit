@@ -133,7 +133,9 @@ if [ ! -x "$CCR_SCRIPT" ]; then
   exit 0
 fi
 
-nohup bash -c "'$CCR_SCRIPT' '$SHA' --repo '$REPO_ROOT' >> '$BG_LOG' 2>&1" </dev/null >/dev/null 2>&1 &
+# Values go in as arguments, never spliced into a shell string — a repo path
+# containing a quote must not be able to inject commands.
+nohup "$CCR_SCRIPT" "$SHA" --repo "$REPO_ROOT" </dev/null >> "$BG_LOG" 2>&1 &
 disown 2>/dev/null || true
 
 log_event "launched" "codex-commit-review fired" \

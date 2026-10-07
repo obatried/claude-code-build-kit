@@ -124,7 +124,7 @@ Exclusions (do these interactively, don't invoke `/build`):
 
 When `/build` is invoked, the manifest at `<repo>/plan/.build-state.json` is the source of truth for state. Never skip manifest updates between chunks.
 
-`/build` ends at QA pass. User pushes to main manually.
+`/build` ends at QA pass; you push to main yourself unless the repo's `CLAUDE.md` or `AGENTS.md` opts into auto-push.
 
 The test: for any task matching the triggers above, did you invoke `/build` before starting edits? If you did 2+ commits interactively on a task that matched, you violated §7.
 
