@@ -84,7 +84,7 @@ _Added: 2026-04-20 | Last reviewed: 2026-04-23_
 
 Writing a skill name with a leading slash as a signoff or on its own line does nothing — it prints the characters, no skill runs. If you want to run a skill, invoke `Skill({skill: "<name>"})`.
 
-**Self-check before stopping:** if your final message ends with a line like `/<word>` (or bolded/punctuated: `**/<word>**`, `/<word>.`, `- /<word>`), you forgot to call Skill. Either invoke it or delete the line. A Stop hook at `~/.claude/hooks/stop-slash-text-guard.sh` audits violations to `~/.claude/analytics/slash-text-violations.jsonl`.
+**Self-check before stopping:** if your final message ends with a line like `/<word>` (or bolded/punctuated: `**/<word>**`, `/<word>.`, `- /<word>`), you forgot to call Skill. Either invoke it or delete the line. This is a self-check; the kit ships no hook that enforces it.
 
 The test: if your final message ends with `/<word>` text and you didn't call the Skill tool that turn, you violated §5.
 

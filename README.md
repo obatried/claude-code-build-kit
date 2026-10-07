@@ -10,15 +10,15 @@ Drop this kit on top of an existing Claude Code install and you get:
 
 1. **`/build`** — a single skill that runs an end-to-end feature build: risk scorecard → plan → Codex audit → atomic chunked commits → multi-reviewer Codex review per commit → QA → summary. A forced five-dimension risk scorecard routes every build to a **fast / standard / full** tier (no flag to skip it); standard and full tiers add a bounded adversarial layer — a per-chunk "definition of done" checklist locked before any code (Codex adds the edge cases), run against each chunk, plus one whole-system integration pass at QA. Reads a manifest at `<repo>/plan/.build-state.json` so a session can resume itself without re-asking for context. Push to main is **opt-in** — declare it in your repo's `CLAUDE.md` or `AGENTS.md` if you want auto-push on QA pass.
 2. **A 10-section CLAUDE.md** — operating principles (think before coding, simplicity first, surgical changes, persistence, unbiased consults) loaded into every conversation.
-3. **9 hooks** that enforce the principles at runtime: auto-Codex on every plan exit, multi-reviewer audit on every commit, vibecop adjudication on every edit, stuck-loop detection, "gave up early" Stop-hook audits, recommendation-hygiene nudges before architectural answers.
+3. **3 hooks** that `/build` depends on at runtime: a Codex audit on every plan exit, a multi-reviewer Codex audit on every commit, and vibecop adjudication on every edit.
 4. **A handoff script** that transitions a heavy session into a fresh one without losing context — drops a prompt file, opens a new Terminal tab, the new session picks up via a `.zshrc` cooperator.
-5. **Codex CLI defaults** at `gpt-5.5` + `medium` reasoning, set globally. Every script on the `/build` path inherits them. The one exception is the `stuck-detector` discipline hook, which forces `high` for its consults.
+5. **Codex CLI defaults** at `gpt-5.5` + `medium` reasoning, set globally. Every script in the kit inherits them; none passes `-m` or `-c` overrides.
 
 ## Hard dependencies
 
 | Tool | Why | Install |
 |---|---|---|
-| [Codex CLI](https://github.com/openai/codex) | Plan/commit reviews, vibecop adjudication, stuck-detector consults | Per OpenAI's instructions |
+| [Codex CLI](https://github.com/openai/codex) | Plan/commit reviews, vibecop adjudication | Per OpenAI's instructions |
 | `jq` | Manifest reads, hook payload parsing | `brew install jq` |
 | `git` | Commits, diffs | Standard |
 
@@ -45,7 +45,7 @@ This kit is **opinionated**, not neutral. By design:
 
 ## What's deliberately not here
 
-This is the build system. It is not the maintainer's full setup. Excluded by design: project-specific scripts, content/lifestyle skills, personal memory, project paths.
+This is the build system. It is not the maintainer's full setup. Excluded by design: project-specific scripts, content/lifestyle skills, personal memory, project paths. The always-on "discipline" hooks that v0.2.0 and earlier shipped (stuck-loop detection, gave-up-early and slash-text Stop audits, recommendation and tool-error nudges) were retired in v0.2.1. The CLAUDE.md rules they audited are now self-checks. See the [CHANGELOG](CHANGELOG.md) upgrade note.
 
 ## License
 

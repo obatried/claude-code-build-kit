@@ -19,7 +19,35 @@ if [ -n "$LATEST_BACKUP" ] && [ -d "$LATEST_BACKUP" ]; then
   rm -rf "$HOME/.claude"
   cp -R "$LATEST_BACKUP" "$HOME/.claude"
 else
-  warn "No backup found at ~/.claude.bak.* — your installed kit will not be removed automatically. Manually remove ~/.claude/skills/build, ~/.claude/scripts/{build-manifest,codex-commit-review*,vibecop-adjudicate*}, and the kit's hooks."
+  # Every path install.sh writes under ~/.claude (tests/install-upgrade.test.sh
+  # checks this list against a real install), then legacy files from v0.2.0
+  # and earlier, which upgraded installs may still have.
+  KIT_FILES="~/.claude/CLAUDE.md
+~/.claude/CLAUDE_MAINTENANCE.md
+~/.claude/CLAUDE_MAP.md
+~/.claude/handoff-v3.sh
+~/.claude/skills/build/SKILL.md
+~/.claude/scripts/build-manifest/manifest.sh
+~/.claude/scripts/codex-commit-review.sh
+~/.claude/scripts/codex-commit-review.prompts/
+~/.claude/scripts/codex-prompt-header.txt
+~/.claude/scripts/vibecop-adjudicate.sh
+~/.claude/scripts/vibecop-adjudicate-heavy.sh
+~/.claude/hooks/codex-plan-review.sh
+~/.claude/hooks/codex-commit-review-on-commit.sh
+~/.claude/hooks/vibecop-on-edit.sh"
+  LEGACY_FILES="~/.claude/scripts/gave-up-early-review.sh
+~/.claude/hooks/stuck-detector.sh
+~/.claude/hooks/stop-slash-text-guard.sh
+~/.claude/hooks/stop-pending-work-guard.sh
+~/.claude/hooks/recommendation-hygiene-nudge.sh
+~/.claude/hooks/gave-up-early-guard.sh
+~/.claude/hooks/codex-tool-error-reminder.sh"
+  warn "No backup found at ~/.claude.bak.* — your installed kit will not be removed automatically. Remove these by hand:
+$KIT_FILES
+Legacy, from v0.2.0 or earlier (if present):
+$LEGACY_FILES
+Then delete the kit's hook registrations from ~/.claude/settings.json. The CLAUDE*.md files replaced any you had before; without a backup those can't be restored."
 fi
 
 # Codex config: only remove if it matches the kit's template byte-for-byte

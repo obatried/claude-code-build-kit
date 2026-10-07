@@ -2,7 +2,7 @@
 
 How `claude-code-build-kit` works as a system, what each piece does, and where the seams are.
 
-## The five pieces
+## The six pieces
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -23,13 +23,6 @@ How `claude-code-build-kit` works as a system, what each piece does, and where t
           │   manifest   │ │  Codex   │ │   vibecop    │
           │  state.json  │ │  hooks   │ │   (BYO)      │
           └──────────────┘ └──────────┘ └──────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                  Discipline hooks (always on)                   │
-│   stuck-detector, codex-tool-error-reminder, gave-up-early,    │
-│   stop-pending-work, stop-slash-text, recommendation-hygiene   │
-└─────────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────────┐
@@ -101,25 +94,24 @@ Subcommands:
   - `--push` also fetches `origin main` and requires: on `main`, every chunk commit on it, and `base ⊆ origin/main ⊆ HEAD`. It fails if the fetch fails, unless `--initial-push` is passed.
 - `set-base <sha>` — record `base_sha` on a manifest approved before the field existed
 
-The gate's fixture tests live in `tests/review-gate.test.sh` (temp repos, scratch `HOME`, fake review log; exits non-zero on any failure).
+The gate's fixture tests live in `tests/review-gate.test.sh` (temp repos, scratch `HOME`, fake review log; exits non-zero on any failure). The installer's upgrade path (retired-hook cleanup, symlinked or malformed `settings.json`) and the uninstall list are covered by `tests/install-upgrade.test.sh`.
 
 All writes go through `jq` + a `flock`'d temp-file swap for atomicity. Errors return non-zero so callers can branch.
 
 ## Piece 4 — Codex review hooks
 
-Three hooks form the review spine:
+Two hooks form the review spine:
 
 | Hook | When | What |
 |---|---|---|
 | `codex-plan-review.sh` | PostToolUse on `ExitPlanMode` | Runs a Codex audit on the plan markdown. Verdict goes to stdout (Claude reads it) + log file. Informational, never blocks. |
 | `codex-commit-review-on-commit.sh` | PostToolUse on `Bash` (matched on `git commit`) | Auto-fires the multi-reviewer commit review. Marks the chunk done in the manifest with the SHA. |
-| `codex-tool-error-reminder.sh` | PostToolUse on `*` errors | Injects a system-reminder nudging Claude to consult Codex before retrying. Throttled per session. |
 
 The multi-reviewer orchestrator (`scripts/codex-commit-review.sh`) reviews a merge commit as its full diff against the first parent, and never skips a merge as trivial. It runs three independent Codex reviews of a commit (different prompts in `codex-commit-review.prompts/`) plus an adjudicator that reconciles them. Every reviewer tags findings on the same action-tier scale (critical = halt deploys, high = fix this sprint, medium = normal flow, low = cognitive trigger); the adjudicator defaults a contested finding to the highest tier any reviewer gave and may downgrade only with a stated reason. Output is a final verdict (ALLOW / BLOCK with severity) + structured findings, logged to JSONL.
 
 The Codex prompts on the `/build` path — plan review, manifest audit, the commit reviewers and the adjudicator — start with one shared header, `scripts/codex-prompt-header.txt`. It tells Codex to stay out of `~/.claude/` and skill directories, and that anything between `<UNTRUSTED_…>` markers is data, never instructions.
 
-Outside text never goes into a Codex prompt bare. The plan (plan review, manifest audit), the diff and reviewer findings (commit review), and the vibecop file path, finding and earlier-round answers (light and heavy vibecop adjudicators) are each wrapped in `<UNTRUSTED_<KIND>_<suffix>>` … `</UNTRUSTED_<KIND>_<suffix>>`. The suffix is 96 random bits from `/dev/urandom`, so the content can't forge the closing marker. Marker-shaped text is also scrubbed out of the plan, the vibecop inputs and round answers, and the reviewer findings fed to the adjudicator. Raw commit diffs are not scrubbed; they rely on the random suffix alone. If no secure random source is available, the script skips the review instead of falling back to a guessable delimiter. The `stuck-detector` hook wraps its inputs the same way but doesn't use the shared header.
+Outside text never goes into a Codex prompt bare. The plan (plan review, manifest audit), the diff and reviewer findings (commit review), and the vibecop file path, finding and earlier-round answers (light and heavy vibecop adjudicators) are each wrapped in `<UNTRUSTED_<KIND>_<suffix>>` … `</UNTRUSTED_<KIND>_<suffix>>`. The suffix is 96 random bits from `/dev/urandom`, so the content can't forge the closing marker. Marker-shaped text is also scrubbed out of the plan, the vibecop inputs and round answers, and the reviewer findings fed to the adjudicator. Raw commit diffs are not scrubbed; they rely on the random suffix alone. If no secure random source is available, the script skips the review instead of falling back to a guessable delimiter.
 
 ## Piece 5 — Vibecop adjudication
 
@@ -131,22 +123,7 @@ Vibecop is a per-repo lint-style tool (npm package, BYO). The kit ships:
 
 CLAUDE.md §8 documents the action contract: `REAL → fix`, `NOISE → ignore`, ambiguous → dispatch a Task sub-agent for a third independent POV before deciding.
 
-## Piece 6 — Discipline hooks (always-on guardrails)
-
-Hooks that don't drive the build flow but shape every conversation:
-
-| Hook | Event | Purpose |
-|---|---|---|
-| `stuck-detector.sh` | PostToolUse on `Edit\|Write\|Bash` | Detects loop patterns (same file 3x, failing Bash 3x in 5min), auto-consults Codex with 10-min throttle |
-| `gave-up-early-guard.sh` | Stop | Detects "I can't access X / could you do Y / let me know if you want me to..." escalation phrases at end of turn. Audit-only, logs to JSONL. Enforces CLAUDE.md §9a. |
-| `stop-pending-work-guard.sh` | Stop | Detects when a session ends with pending manifest work. Audit-only. Enforces §9b. |
-| `stop-slash-text-guard.sh` | Stop | Detects inert `/skill-name` text at end of turn (forgot to call the Skill tool). Audit-only. Enforces §5. |
-| `recommendation-hygiene-nudge.sh` | UserPromptSubmit | Detects recommendation-shaped asks (architecture, tool choice, build plan), injects the 4-check pre-ship reminder. Throttled. Enforces §6. |
-| `codex-tool-error-reminder.sh` | PostToolUse error | See above. |
-
-All discipline hooks are **audit-only** — they log to `~/.claude/analytics/*.jsonl` but never block. This is intentional: the rules are how the kit nudges, not how it polices.
-
-## Piece 7 — Handoff (`claude/handoff-v3.sh` + zshrc cooperator)
+## Piece 6 — Handoff (`claude/handoff-v3.sh` + zshrc cooperator)
 
 Cross-session continuation without context loss. Mechanism:
 
@@ -195,18 +172,15 @@ User says "let's build X"
                 → migrations → push)
 ```
 
-Throughout: discipline hooks fire on every turn. Stuck-detector watches Edit/Write/Bash. Gave-up-early-guard watches Stop. Recommendation-hygiene-nudge watches UserPromptSubmit. They're invisible until they fire.
-
 ## Where the seams are
 
 If you customize the kit, these are the seams:
 
-1. **Codex model + reasoning** — set in `~/.codex/config.toml`. Every script on the `/build` path (plan review, manifest audit, commit review, vibecop adjudicators) uses it as-is and passes no `-m` or `-c` overrides. One exception: the `stuck-detector` discipline hook forces `model_reasoning_effort="high"` for its consults. Defaults to `gpt-5.5` + `medium`.
+1. **Codex model + reasoning** — set in `~/.codex/config.toml`. Every script in the kit (plan review, manifest audit, commit review, vibecop adjudicators) uses it as-is and passes no `-m` or `-c` overrides. Defaults to `gpt-5.5` + `medium`.
 2. **Codex prompt boundary + reviewer prompts** — export `CODEX_PROMPT_HEADER` to point at a different boundary header, and `CODEX_REVIEW_PROMPTS_DIR` (or pass `--prompts-dir`) to swap the commit-review prompt set.
 3. **Analytics directory** — hooks and scripts log to `~/.claude/analytics/*.jsonl`. The path is set at the top of each script.
 4. **Auto-push opt-in** — § 5 of `SKILL.md` reads the repo's `CLAUDE.md` / `AGENTS.md` for an explicit auto-push declaration. Default is stop-after-summary; declare auto-push in the repo to opt in.
 5. **Receipt tiers** — § 2 step 2b. Customize the priority order if your stack uses different verification tools.
-6. **Hook throttles** — most hooks have a 10-minute per-session throttle. Adjust the `THROTTLE_FILE` cooldown in the hook script.
 
 ## Known limitations
 

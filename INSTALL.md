@@ -14,22 +14,23 @@ Then restart your shell and try `/build` in any project.
 
 1. **Checks hard dependencies** — `codex`, `jq`, `git`, `bash`. Fails loud if any are missing.
 2. **Warns on the soft dependency** — [gstack](https://github.com/garrytan/gstack). Install proceeds either way. Vibecop is per-repo (npm), so the installer doesn't probe for it; the `vibecop-on-edit` hook no-ops cleanly when it's not present.
-3. **Backs up your existing `~/.claude/`** to `~/.claude.bak.<timestamp>/` before touching anything.
-4. **Copies files** into the right paths:
+3. **Checks the shape of an existing `~/.claude/settings.json`.** It must be valid JSON: an object whose `hooks` (if present) maps each event to an array of `{matcher?, hooks: [...]}` groups, with each hook an object with a string `command` (or a non-`command` `type`, such as `prompt`). If it isn't, the installer stops here with a clear error, before any backup, cleanup or copy.
+4. **Backs up your existing `~/.claude/`** to `~/.claude.bak.<timestamp>/` before touching anything. If `settings.json` is a symlink, the backup also gets a dereferenced copy, `settings.json.resolved`.
+5. **Removes retired kit hook registrations, before any file is copied** (an upgrade from v0.2.0 or earlier). It removes only the exact (event, matcher, command) entries the old kit template wrote for the six retired hooks. Any other entry that mentions a retired hook (a different matcher or event, an edited command) is left in place and listed.
+6. **Copies files** into the right paths:
    - `~/.claude/CLAUDE.md`, `CLAUDE_MAINTENANCE.md`, `CLAUDE_MAP.md`
    - `~/.claude/skills/build/SKILL.md`
    - `~/.claude/scripts/build-manifest/manifest.sh`
    - `~/.claude/scripts/codex-commit-review.sh` + `.prompts/`
    - `~/.claude/scripts/codex-prompt-header.txt` (the shared boundary header every Codex prompt starts with)
    - `~/.claude/scripts/vibecop-adjudicate*.sh`
-   - `~/.claude/scripts/gave-up-early-review.sh`
-   - 9 hooks under `~/.claude/hooks/`
+   - 3 hooks under `~/.claude/hooks/`: `codex-plan-review.sh`, `codex-commit-review-on-commit.sh`, `vibecop-on-edit.sh`
    - `~/.claude/handoff-v3.sh`
-5. **Merges hooks into `~/.claude/settings.json`** using `jq`. If you already have hooks, the kit's hooks are appended; nothing is overwritten.
-6. **Drops `~/.codex/config.toml`** if you don't have one (`gpt-5.5` + `medium` defaults).
-7. **Appends a handoff-pickup block to `~/.zshrc`** (idempotent — checks for the marker before appending).
-8. **`chmod +x`** every script.
-9. **Smoke-tests** by invoking `manifest.sh` to confirm it's executable.
+7. **`chmod +x`** every installed script.
+8. **Lists leftover retired files** (after an upgrade): one shell-quoted `rm` line per file still on disk. It never deletes them itself.
+9. **Merges hooks into `~/.claude/settings.json`** using `jq`. If you already have hooks, the kit's hooks are appended; nothing else is overwritten. Writes go *through* a symlinked `settings.json`.
+10. **Drops `~/.codex/config.toml`** if you don't have one (`gpt-5.5` + `medium` defaults), then **appends a handoff-pickup block to `~/.zshrc`** (idempotent — checks for the marker before appending).
+11. **Smoke-tests** by invoking `manifest.sh` to confirm it's executable.
 
 ## Manual install
 
@@ -70,7 +71,7 @@ codex exec --skip-git-repo-check "Reply with the model name and reasoning effort
 
 # 3. Hooks are wired
 jq '.hooks' ~/.claude/settings.json
-# Expected: PostToolUse, UserPromptSubmit, Stop blocks present
+# Expected: a PostToolUse block with the ExitPlanMode, Bash and Edit|Write|MultiEdit matchers
 ```
 
 In a Claude Code session, the philosophy loads automatically (you'll see CLAUDE.md content in your context). Try `/build` in any project to invoke the orchestrator.

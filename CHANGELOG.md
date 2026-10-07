@@ -1,5 +1,59 @@
 # Changelog
 
+## v0.2.1 — 2026-10-07
+
+Trims the kit to what `/build` actually uses.
+
+### Removed
+- **Six always-on "discipline" hooks**, which the maintainer retired from their own setup: `stuck-detector.sh`, `stop-slash-text-guard.sh`, `stop-pending-work-guard.sh`, `recommendation-hygiene-nudge.sh`, `gave-up-early-guard.sh` and `codex-tool-error-reminder.sh`.
+- **`scripts/gave-up-early-review.sh`**, a one-shot report over `gave-up-early-guard.sh`'s log, built around a dated launchd schedule.
+- The `UserPromptSubmit` and `Stop` hook registrations in `settings.template.json`. Only `PostToolUse` remains.
+
+### Kept
+- `codex-plan-review.sh`, `codex-commit-review-on-commit.sh` and `vibecop-on-edit.sh`. `/build` depends on all three.
+- The CLAUDE.md rules those hooks audited (§5 slash-text, §9 persistence). They are now self-checks; CLAUDE.md and CLAUDE_MAP.md no longer claim a hook enforces them.
+
+### Tests
+- `tests/install-upgrade.test.sh` covers:
+  - the upgrade cleanup (kit-shaped entries removed, other entries kept and listed)
+  - a symlinked `settings.json` and idempotent re-runs
+  - malformed settings (`[]`, `false`, `null` entries, scalars) rejected before anything is touched, while a valid `prompt`-type hook is accepted
+  - the user's own hooks surviving
+  - a `HOME` containing a space, where the printed `rm` lines are actually run
+  - the uninstall list matching what `install.sh` installs
+
+### Docs
+- README, ARCHITECTURE, INSTALL and the walkthrough now describe 3 hooks.
+- The stuck-detector "forces high reasoning" exception is gone; every script in the kit now uses `~/.codex/config.toml` as-is.
+
+### Upgrading from v0.2.0 or earlier
+- **Re-run `./install.sh`.** In order, it: checks the shape of `settings.json`, backs up `~/.claude/`, removes the retired registrations, copies the new files, lists leftover retired files, then merges hooks.
+  - **Shape check, first, before the backup:** the installer checks the shape of `settings.json`. It requires an object; `hooks` absent or an object; each event an array of `{matcher?, hooks: [...]}` groups; and each hook an object with a string `command`, or a non-`command` `type` such as `prompt`. On anything else (`"hooks": []`, `"hooks": false`, `null` entries, invalid JSON) it stops with a clear error. Nothing is changed, backed up or installed, and no temp file is left behind.
+- **Registration cleanup.** It removes the six retired hooks' registrations from `~/.claude/settings.json`, but only the exact (event, matcher, command) entries every earlier kit template wrote:
+  - `PostToolUse` / `Edit|Write|Bash` / `$HOME/.claude/hooks/stuck-detector.sh`
+  - `PostToolUse` / `*` / `…/codex-tool-error-reminder.sh`
+  - `UserPromptSubmit` (no matcher) / `…/recommendation-hygiene-nudge.sh`
+  - `Stop` (no matcher) / `…/stop-slash-text-guard.sh`, `…/gave-up-early-guard.sh`, `…/stop-pending-work-guard.sh`
+
+  It drops a matcher group only if that removal emptied it. Any other entry that mentions a retired hook stays and is listed in a notice.
+  - A symlinked `settings.json` stays a symlink; the change is written to its target, and the backup gets a dereferenced copy, `settings.json.resolved`.
+  - Leftover files are reported as one shell-quoted `rm` line each, so paths containing spaces are safe to paste.
+
+  It does **not** delete the old files. They are inert once unregistered. For each one still on disk it prints a line like:
+
+  ```bash
+  rm /Users/you/.claude/hooks/stuck-detector.sh
+  ```
+- **Entries the installer leaves alone** are the ones under a different event or matcher, or with an edited command (different path, wrapper script). It lists them on every run. Find them yourself with:
+
+  ```bash
+  jq -r '.. | .command? // empty' ~/.claude/settings.json \
+    | grep -E 'stuck-detector|stop-slash-text-guard|stop-pending-work-guard|recommendation-hygiene-nudge|gave-up-early-guard|codex-tool-error-reminder'
+  ```
+
+  Then delete those entries by hand.
+- **`uninstall.sh` restores the most recent `~/.claude.bak.*`.** After an upgrade, that backup is your v0.2.0 install, retired hooks included. To get back to your pre-kit setup, restore the oldest backup from before your first install instead. With no backup, the uninstaller prints a manual-removal list of every file `install.sh` installs, plus the retired files as legacy entries. `tests/install-upgrade.test.sh` checks that list against a real install.
+
 ## v0.2.0 — 2026-10-07
 
 Brings `/build` and its scripts up to date with the maintainer's current version.

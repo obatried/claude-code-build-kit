@@ -148,13 +148,3 @@ If at any point during execute you had hit a problem `/build` couldn't solve in 
 3. Claude surfaces to you in a single message: what was tried (3 attempts), what Codex said, what's blocking.
 
 Resume by re-invoking `/build` once you've cleared the blocker — it picks up from `manifest.sh next-chunk` exactly where it stopped.
-
-## What you'd never see in this trace
-
-The discipline hooks fire silently:
-
-- `stuck-detector` watches Edit/Write/Bash. If you'd hit the same file 3× or seen failing Bash 3× in 5 minutes, it auto-consults Codex and surfaces back.
-- `gave-up-early-guard` watches end-of-turn for "I can't access X / could you do Y" phrases — audit-only, logged.
-- `recommendation-hygiene-nudge` would have fired if your initial prompt had been a recommendation-shaped ask ("what's the best way to..."). For `/build add X`, it stays quiet.
-
-These are invisible until they're not.
